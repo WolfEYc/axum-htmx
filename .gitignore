@@ -1,3 +1,3 @@
 .vscode
 /target
-Secrets*.toml
+secrets.key
