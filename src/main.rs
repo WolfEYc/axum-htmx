@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use axum::{routing::{get, post}, Router, handler::HandlerWithoutStateExt};
 
-mod page;
 mod strings;
+mod page;
 mod pages;
 mod components;
 

@@ -3,12 +3,12 @@ use maud::{html, Markup, DOCTYPE};
 
 fn body(content: Markup) -> Markup {
     html! {
-        body {
-            (content)
-            script src="js/vendor/htmx.min.js" {}
-            script src="js/vendor/modernizr-3.11.2.min.js" {}
-            script src="js/plugins.js" {}
-            script src="js/main.js" {}
+        body hx-ext="loading-states" {
+            main class="container" {
+                (content)
+            }
+            script src="js/htmx.min.js" {}
+            script src="js/loading-states.min.js" {}
             // TODO: Google Analytics: change UA-XXXXX-Y to be your site's ID.
             (google_analytics("UA-XXXXX-Y"))
             // Non-H5BP editorial comment: please consider using another analytics solution
@@ -39,19 +39,21 @@ fn head(title: &str, desc: &str, url: &str) -> Markup {
             meta property="og:type" content=(strings::WEBSITE);
             meta property="og:url" content=(url);
             meta property="og:image" content="";
+            meta charset="utf-8";
+            meta name="viewport" content="width=device-width, initial-scale=1";
             link rel="manifest" href="site.webmanifest";
             link rel="apple-touch-icon" href="icon.png";
-            link rel="stylesheet" href="css/normalize.css";
-            link rel="stylesheet" href="css/main.css";
+            link rel="stylesheet" href="css/pico.min.css";
+            link rel="stylesheet" href="css/pico_overrides.css";
             meta name="theme-color" content="#fafafa";
         }
     }
 }
 
-pub(crate) fn page(host: &str, title: &str, desc: &str, lang: &str, content: Markup) -> Markup {
+pub(crate) fn page(host: &str, title: &str, desc: &str, content: Markup) -> Markup {
     html! {
         (DOCTYPE)
-        html class="no-js" lang=(lang) {
+        html class="no-js" lang="en" {
             (head(title, desc, host))
             (body(content))
         }

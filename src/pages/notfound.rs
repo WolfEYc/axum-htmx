@@ -1,9 +1,7 @@
-use axum::{response::IntoResponse, http::StatusCode};
-use maud::{html, PreEscaped};
+use maud::{html, PreEscaped, Markup};
 use crate::strings;
 
-pub async fn not_found() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND,
+pub async fn not_found() -> Markup {
     html! {
         html lang="en" {
             head {
@@ -11,6 +9,7 @@ pub async fn not_found() -> impl IntoResponse {
                 title { (strings::NOT_FOUND_TITLE) }
                 meta name=(strings::VIEWPORT) content=(strings::VIEWPORT_CONTENT);
                 style { (strings::NOT_FOUND_STYLE) }
+                link rel="stylesheet" href="css/pico.classless.min.css";
             }
             body {
                 h1 { (strings::NOT_FOUND_TITLE) }
@@ -18,5 +17,5 @@ pub async fn not_found() -> impl IntoResponse {
             }
             (PreEscaped(strings::NOT_FOUND_COMMENT))
         }
-    })
+    }
 }

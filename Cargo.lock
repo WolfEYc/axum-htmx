@@ -226,6 +226,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-htmx"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "axum-extra",
+ "maud",
+ "serde",
+ "shuttle-axum",
+ "shuttle-runtime",
+ "shuttle-static-folder",
+ "sqlx",
+ "tokio",
+ "tower-http",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -505,22 +521,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "envtory"
-version = "0.1.0"
-dependencies = [
- "axum",
- "axum-extra",
- "maud",
- "serde",
- "shuttle-axum",
- "shuttle-runtime",
- "shuttle-static-folder",
- "sqlx",
- "tokio",
- "tower-http",
 ]
 
 [[package]]
