@@ -1,5 +1,6 @@
-use std::path::PathBuf;
-use axum::{routing::{get, post}, Router, handler::HandlerWithoutStateExt};
+use axum::{routing::{get, post}, Router, Server, handler::HandlerWithoutStateExt};
+use std::net::SocketAddr;
+use tower_http::services::ServeDir;
 
 mod strings;
 mod page;
@@ -8,17 +9,18 @@ mod components;
 
 use components::*;
 use pages::*;
-use tower_http::services::ServeDir;
 
-#[shuttle_runtime::main]
-async fn main(
-    #[shuttle_static_folder::StaticFolder] static_folder: PathBuf,
-) -> shuttle_axum::ShuttleAxum {
-
+#[tokio::main]
+async fn main() {
     let router = Router::new()
-    .route("/", get(index::index))
-    .route("/hello", post(hello::hello))
-    .fallback_service(ServeDir::new(static_folder).not_found_service(notfound::not_found.into_service()));
+        .route("/", get(index::index))
+        .route("/hello", post(hello::hello))
+        .fallback_service(ServeDir::new("/static").not_found_service(notfound::not_found.into_service()));
 
-    Ok(router.into())
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    
+    Server::bind(&addr)
+        .serve(router.into_make_service())
+        .await
+        .unwrap();
 }

@@ -9,5 +9,5 @@ axum-extra = { version = "0.7.7", features = ["cookie-private"] }
 maud = { version = "0.25.0", features = ["axum"] }
 serde = { version = "1.0.185", features = ["derive"] }
 sqlx = { version = "0.7.1", features = ["macros", "postgres", "runtime-tokio-rustls"] }
-tokio = { version = "1.28.2", features = ["time"] }
+tokio = { version = "1.28.2", features = ["full"] }
 tower-http = { version = "0.4.3", features = ["fs"] }
