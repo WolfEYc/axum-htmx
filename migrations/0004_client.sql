@@ -1,0 +1,6 @@
+CREATE TABLE client (
+    id BIGSERIAL PRIMARY KEY,
+    access SMALLINT NOT NULL,
+    email VARCHAR(50) NOT NULL,
+    hashword VARCHAR(128) NOT NULL
+);

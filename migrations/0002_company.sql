@@ -1,5 +1,5 @@
-create table company (
-    id serial primary key,
-    name varchar not null,
-    description varchar
+CREATE TABLE company (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    description VARCHAR(200)
 );
