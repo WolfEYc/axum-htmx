@@ -1,28 +1,17 @@
+use serde::Deserialize;
 use sqlx::{FromRow, PgPool, Error, postgres::PgQueryResult, PgConnection};
-
-#[derive(Debug)]
-pub struct SearchFilter {
-    pub item_name: String,
-    pub page_size: i64,
-    pub page: i64
-}
-
-impl SearchFilter {
-    pub fn calc_offset(&self) -> i64 {
-        self.page * self.page_size
-    }
-}
+use super::{SearchFilter, PAGE_SIZE};
 
 #[derive(Debug, FromRow)]
 pub struct ItemOwnershipDisplay {
     pub id: i64,
     pub name: String,
+    pub amount: i64,
     pub price: Option<f32>,
     pub description: Option<String>,
-    pub amount: i64
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct ItemOwnership {
     pub company_id: i32,
     pub item_id: i64,
@@ -42,7 +31,7 @@ pub async fn create(ownership: &ItemOwnership, pool: &PgPool) -> Result<PgQueryR
     .await
 }
 
-pub async fn read(company_id: i32, pool: &PgPool, filter: SearchFilter) -> Result<Vec<ItemOwnershipDisplay>, Error> {
+pub async fn read(filter: SearchFilter, pool: &PgPool) -> Result<Vec<ItemOwnershipDisplay>, Error> {
     sqlx::query_as!(ItemOwnershipDisplay,"
         SELECT item.*, company_owns_item.amount
         FROM company_owns_item
@@ -53,16 +42,16 @@ pub async fn read(company_id: i32, pool: &PgPool, filter: SearchFilter) -> Resul
         OFFSET $3
         LIMIT $4
     ",
-    company_id,
-    filter.item_name,
+    filter.owner_id,
+    filter.name,
     filter.calc_offset(),
-    filter.page_size
+    PAGE_SIZE
     )
     .fetch_all(pool)
     .await
 }
 
-pub async fn update_replace(req: &ItemOwnership, pool: &PgPool) -> Result<(), Error> {
+pub async fn update_replace(req: ItemOwnership, pool: &PgPool) -> Result<(), Error> {
     let mut txn = pool.begin().await?;
 
     sqlx::query!("
@@ -83,7 +72,7 @@ pub async fn update_replace(req: &ItemOwnership, pool: &PgPool) -> Result<(), Er
 }
 
 /// Negative numbers are for subtracting
-pub async fn update_add(req: &ItemOwnership, pool: &PgPool) -> Result<(), Error> {
+pub async fn update_add(req: ItemOwnership, pool: &PgPool) -> Result<(), Error> {
     let mut txn = pool.begin().await?;
 
     sqlx::query!("

@@ -4,7 +4,7 @@ use crate::{page, components::otc_form::otc_form};
 
 pub async fn index(req: Request<Body>) -> Markup {
     let host = format!("{}", req.uri());
-    let title = "axum-htmx";
+    let title = "axum-htmx-signup";
     let desc = "This is a template. There are many like it but this one is mine.";
     // TODO: Add your site or application content here.
     let content = html! {

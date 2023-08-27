@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let router = Router::new()
         .route("/", get(index::index))
         .route("/hello", post(hello::hello))
-        .fallback_service(ServeDir::new("/static")
+        .fallback_service(ServeDir::new("./static")
             .not_found_service(notfound::not_found.into_service()))
         .with_state(pool);
 

@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use sqlx::{FromRow, PgPool, Error, postgres::PgQueryResult};
 
 #[derive(Debug, FromRow)]
@@ -7,16 +8,15 @@ pub struct Company {
     pub description: Option<String>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct CreateCompanyReq {
     pub name: String,
     pub description: Option<String>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct UpdateCompanyReq {
     pub id: i32,
-    pub name: Option<String>,
     pub description: Option<String>
 }
 
@@ -42,24 +42,37 @@ pub async fn read_all(ids: Vec<i32>, pool: &PgPool, ) -> Result<Vec<Company>, Er
     .await
 }
 
-pub async fn read_one(id: i32, pool: &PgPool) -> Result<Option<Company>, Error> {
+pub async fn read_one(id: i32, pool: &PgPool) -> Result<Company, Error> {
     sqlx::query_as!(Company,"
-        SELECT * 
+        SELECT *
         FROM company
-        WHERE id = $1",
+        WHERE id = $1
+    ",
     id
     )
-    .fetch_optional(pool)
+    .fetch_one(pool)
     .await
 }
 
-pub async fn update(company: &UpdateCompanyReq, pool: &PgPool) -> Result<PgQueryResult, Error> {
+pub async fn is_verified(id: i32, pool: &PgPool) -> Result<bool, Error> {
+    Ok(sqlx::query!("
+        SELECT 1 as verified
+        FROM verified_company
+        WHERE company_id = $1
+    ",
+    id
+    )
+    .fetch_optional(pool)
+    .await?
+    .is_some())
+}
+
+pub async fn update(company: &Company, pool: &PgPool) -> Result<PgQueryResult, Error> {
     sqlx::query!("
         UPDATE company
-        SET name = $2, description = $3
+        SET description = $2
         WHERE id = $1",
     company.id,
-    company.name,
     company.description
     )
     .execute(pool)

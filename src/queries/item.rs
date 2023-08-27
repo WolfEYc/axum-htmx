@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use sqlx::{FromRow, PgPool, Error, postgres::PgQueryResult};
 
 #[derive(Debug, FromRow)]
@@ -8,22 +9,21 @@ pub struct Item {
     pub description: Option<String>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct CreateItemReq {
     pub name: String,
     pub price: Option<f32>,
     pub description: Option<String>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct UpdateItemReq {
     pub id: i64,
-    pub name: Option<String>,
     pub price: Option<f32>,
     pub description: Option<String>
 }
 
-pub async fn create(item: &CreateItemReq, pool: &PgPool) -> Result<PgQueryResult, Error> {
+pub async fn create(item: CreateItemReq, pool: &PgPool) -> Result<PgQueryResult, Error> {
     sqlx::query!("
         INSERT INTO item VALUES
         (DEFAULT, $1, $2, $3)",
@@ -57,13 +57,12 @@ pub async fn read_one(id: i64, pool: &PgPool) -> Result<Option<Item>, Error> {
     .await
 }
 
-pub async fn update(item: &UpdateItemReq, pool: &PgPool) -> Result<PgQueryResult, Error> {
+pub async fn update(item: UpdateItemReq, pool: &PgPool) -> Result<PgQueryResult, Error> {
     sqlx::query!("
         UPDATE item
-        SET name = $2, price = $3, description = $4
+        SET price = $2, description = $3
         WHERE id = $1",
     item.id,
-    item.name,
     item.price,
     item.description
     )
