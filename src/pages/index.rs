@@ -1,6 +1,5 @@
 use axum::{http::Request, body::Body};
 use maud::{Markup, html};
-use crate::{page, components::otc_form::otc_form};
 
 pub async fn index(req: Request<Body>) -> Markup {
     let host = format!("{}", req.uri());
@@ -15,7 +14,6 @@ pub async fn index(req: Request<Body>) -> Markup {
             input type="text" name="name" value="" placeholder="What's your name?";
             button data-loading-aria-busy { "Submit" }
         }
-        (otc_form())
     };
 
     page::page(&host, title, desc, content)

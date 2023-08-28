@@ -1,5 +1,5 @@
 /// HTML5 Boilerplate &strs
-
+pub static TOTP_ISSUER: &str = "axum-HTMX";
 pub static DESCRIPTION: &str = "description";
 pub static NOT_FOUND_COMMENT: &str = "<!-- IE needs 512+ bytes: https://docs.microsoft.com/archive/blogs/ieinternals/friendly-http-error-pages -->";
 pub static NOT_FOUND_MESSAGE: &str = "Sorry, but the page you were trying to view does not exist.";

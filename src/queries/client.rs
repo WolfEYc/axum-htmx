@@ -4,22 +4,40 @@ use sqlx::{FromRow, PgPool, postgres::PgQueryResult, Error};
 #[derive(Debug, FromRow)]
 pub struct Client {
     pub id: i64,
-    pub otp_b32: String,
-    pub username: String
+    pub username: String,
+    pub otp_b32: String
+}
+
+#[derive(Debug)]
+pub struct CreateClientReq {
+    pub username: String,
+    pub otp_b32: String
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CreateClientReq {
-    pub otp_b32: String,
+pub struct ValidateUsernameReq {
     pub username: String
+}
+
+pub async fn is_valid(req: &ValidateUsernameReq, pool: &PgPool) -> Result<bool, Error> {
+    Ok(sqlx::query!("
+        SELECT 1 as exists
+        FROM client
+        WHERE username = $1
+    ",
+    req.username
+    )
+    .fetch_optional(pool)
+    .await?
+    .is_none())
 }
 
 pub async fn create(req: CreateClientReq, pool: &PgPool) -> Result<PgQueryResult, Error> {
     sqlx::query!("
         INSERT INTO client VALUES
         (DEFAULT, $1, $2)",
-    req.otp_b32,
-    req.username
+    req.username,
+    req.otp_b32
     )
     .execute(pool)
     .await
