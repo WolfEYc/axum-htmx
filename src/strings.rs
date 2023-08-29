@@ -53,3 +53,4 @@ pub static UTF8: &str = "utf-8";
 pub static VIEWPORT: &str = "viewport";
 pub static VIEWPORT_CONTENT: &str = "width=device-width, initial-scale=1";
 pub static WEBSITE: &str = "website";
+pub static TARGET_ERROR: &str = "hx-target-4xx=#error";

@@ -1,76 +1,64 @@
 use std::string::FromUtf8Error;
-
-use axum::{http::Request, body::Body, extract::State, Form};
+use axum::{http::{Request, StatusCode}, body::Body, extract::State, Form, Router, routing::{get, post}};
 use maud::{Markup, html};
 use serde::Deserialize;
-use totp_rs::{Secret, Rfc6238, TOTP};
-use crate::{page, components::{six_digit_entry::{six_digit_entry, self}, error::error_html, copyblock::copyblock}, queries::client::{self, ValidateUsernameReq}, AppState, strings::TOTP_ISSUER};
+use crate::{page, components::{six_digit_entry::six_digit_entry, error::error_html, copyblock::copyblock}, queries::client::{self, ValidateUsernameReq, CreateClientReq}, AppState, auth::{create_totp, verify_6digit_b32}, strings::TARGET_ERROR};
 
-pub async fn username_form(req: Request<Body>) -> Markup {
+///On success, will set jwt access token cookie and redirect to console
+pub async fn index(req: Request<Body>) -> Markup {
     let host = req.uri().to_string();
     let title = "axum-htmx-signup";
     let desc = "Create an account";
     
     let content = html! {
         h1 align="center" { "Create Account" }
-        
-        form hx-post="/validate-username" hx-swap="outerHTML" data-loading-states {
+        form hx-ext="response-targets" hx-post="/validate-username" hx-swap="outerHTML" {(TARGET_ERROR)} data-loading-states {
             label for="username" { "Username" }
             input type="text" name="username" placeholder="username" required;
             small { "Unique & Permanent" }
             button data-loading-aria-busy { "Check Username" }
+            #error {}
         }
     };
 
     page::page(&host, title, desc, content)
 }
 
-pub async fn validate_username(State(state): State<AppState>, form: Form<ValidateUsernameReq>) -> Markup {
+pub async fn validate_username(State(state): State<AppState>, form: Form<ValidateUsernameReq>) -> (StatusCode, Markup) {
     match client::is_valid(&form.0, &state.db).await {
-        Err(err) => html!(div class="error-message" { (err.to_string()) }),
-        Ok(false) => html!(div class="error-message" { "Username taken" }),
-        Ok(true) => otp_form(form.0.username)
+        Err(err) => (StatusCode::BAD_REQUEST, error_html(err)),
+        Ok(false) => (StatusCode::FORBIDDEN, error_html("Username already taken")),
+        Ok(true) => new_otp_form(form.0.username)
     }
 }
 
-fn otp_form(username: String) -> Markup {
-    
-    let secret = Secret::generate_secret().to_bytes();
-    let Ok(secret) = secret else {
-        return error_html(secret.unwrap_err());
-    };
-
-    let rfc = Rfc6238::with_defaults(secret);
-    let Ok(mut rfc) = rfc else {
-        return error_html(rfc.unwrap_err());
-    };
-
-    rfc.issuer(TOTP_ISSUER.to_string());
-    rfc.account_name(username.clone());
-    
-    let totp = TOTP::from_rfc6238(rfc);
-    let Ok(totp) = totp else {
-        return error_html(totp.unwrap_err());
-    };
-
-    let qr = totp.get_qr();
-    let Ok(qr) = qr else {
-        return error_html(qr.unwrap_err());
-    };
-
-    let secret = totp.get_secret_base32();
-
+fn otp_form(qr: String, secret_b32: String) -> Markup {
     html! {
-        form hx-post="/client" hx-swap="outerHTML" {
+        form hx-post="/signup-submission" hx-swap="outerHTML" {
             label for="qr" { "Scan me with your auth app" }
             small { "Preferably one that is backed up (not Google Authenticator)" }
             img src=(qr);
-            (copyblock("otc_b32".to_string(), secret))
+            (copyblock("otc_b32".to_string(), secret_b32))
             small { "Or manually add code" }
             (six_digit_entry())
             button data-loading-aria-busy { "Create Account" }
         }
     }
+}
+
+fn new_otp_form(username: String) -> (StatusCode, Markup) {
+    let totp = create_totp(username);
+    let Ok(totp) = totp else {
+        return (StatusCode::BAD_REQUEST, error_html(totp.unwrap_err()));
+    };
+
+    let qr = totp.get_qr();
+    let Ok(qr) = qr else {
+        return (StatusCode::BAD_REQUEST, error_html(qr.unwrap_err()));
+    };
+
+    let secret = totp.get_secret_base32();
+    (StatusCode::OK, otp_form(qr, secret))
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,16 +79,25 @@ impl SignupSubmissionReq {
     }
 }
 
-pub async fn signup_submission(State(state): State<AppState>, form: Form<SignupSubmissionReq>) -> Markup {
-    
+pub async fn validate_otp(State(state): State<AppState>, form: Form<SignupSubmissionReq>) -> (StatusCode, Markup) {
     let sixdigits = form.get_six_digits();
-    if let Err(sixdigits) = sixdigits {
-        
+    let Ok(sixdigits) = sixdigits else {
+        return (StatusCode::BAD_REQUEST, error_html(sixdigits.unwrap_err()));
+    };
+
+    if let Err(verification) = verify_6digit_b32(&form.otp_b32, sixdigits) {
+        return (StatusCode::BAD_REQUEST, error_html(verification));
     }
-
-    if let Err(verify_6digit_b32(form))
     
-
+    match client::create(CreateClientReq{ username: form.username, otp_b32: form.otp_b32 }, &state.db).await {
+        Ok(client_id) => 
+    }
 }
 
+pub fn signup_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", get(index))
+        .route("/validate-username", post(validate_username))
+        .route("/validate-otp", post(validate_otp))
+}
 

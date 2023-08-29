@@ -9,6 +9,7 @@ fn body(content: Markup) -> Markup {
             }
             script src="js/htmx.min.js" {}
             script src="js/loading-states.min.js" {}
+            script src="js/response-targets.min.js" {}
             script src="js/copytext.js" {}
             // TODO: Google Analytics: change UA-XXXXX-Y to be your site's ID.
             (google_analytics("UA-XXXXX-Y"))

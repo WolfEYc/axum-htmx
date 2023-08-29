@@ -4,6 +4,7 @@ use std::{net::SocketAddr, error::Error};
 use tower_http::services::ServeDir;
 
 mod auth;
+mod app_env;
 mod db;
 mod strings;
 mod page;
@@ -29,10 +30,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let router = Router::new()
         .route("/", get(index::index))
         .route("/hello", post(hello::hello))
-        .route("/signup", 
-            get(signup::username_form)
-            .post(signup::validate_username))
-        .route("/client", post(signup::signup_submission))
+        .nest("/signup", signup::signup_routes())
         .with_state(AppState{ db: pool })
         .fallback_service(ServeDir::new("./static")
             .not_found_service(notfound::not_found.into_service()));

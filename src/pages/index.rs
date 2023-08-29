@@ -1,6 +1,8 @@
 use axum::{http::Request, body::Body};
 use maud::{Markup, html};
 
+use crate::page;
+
 pub async fn index(req: Request<Body>) -> Markup {
     let host = format!("{}", req.uri());
     let title = "axum-htmx";
