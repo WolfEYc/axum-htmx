@@ -1,9 +1,7 @@
 use maud::{html, Markup};
 
-pub fn copyblock(name: String, text: String) -> Markup {
+pub fn copyblock(text: String) -> Markup {
     html! {
-        copyblock class="copyblock" {
-            input type="text" name=(name) value=(text) readonly;
-        }
+        button type="button" id="cpybtn" class="secondary outline center" data-tooltip="Copy" onclick=(format!("copyToClipboard('{}', this)", text)) { (text) }
     }
 }

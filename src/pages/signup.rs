@@ -1,20 +1,22 @@
-use std::string::FromUtf8Error;
-use axum::{http::{Request, StatusCode}, body::Body, extract::State, Form, Router, routing::{get, post}};
+use axum::{http::{Request, StatusCode}, body::Body, Form, Router, routing::{get, post}, extract::State, response::{Response, IntoResponse}};
+use axum_extra::extract::{PrivateCookieJar, cookie::Cookie};
+use jwt::SignWithKey;
 use maud::{Markup, html};
 use serde::Deserialize;
-use crate::{page, components::{six_digit_entry::six_digit_entry, error::error_html, copyblock::copyblock}, queries::client::{self, ValidateUsernameReq, CreateClientReq}, AppState, auth::{create_totp, verify_6digit_b32}, strings::TARGET_ERROR};
+use serde_json::json;
+use crate::{page::{self, hx_redirect}, components::{error::error_html, copyblock::copyblock, six_digit_entry::six_digit_entry}, queries::client::{self, CreateClientReq}, auth::{create_totp, verify_6digit_b32}, strings::{TARGET_ERROR, qr}, app_env::AppState};
 
 ///On success, will set jwt access token cookie and redirect to console
-pub async fn index(req: Request<Body>) -> Markup {
+async fn index(req: Request<Body>) -> Markup {
     let host = req.uri().to_string();
     let title = "axum-htmx-signup";
     let desc = "Create an account";
     
     let content = html! {
         h1 align="center" { "Create Account" }
-        form hx-ext="response-targets" hx-post="/validate-username" hx-swap="outerHTML" {(TARGET_ERROR)} data-loading-states {
+        form hx-ext="response-targets" hx-post="/signup/validate-username" hx-swap="outerHTML" .{(TARGET_ERROR)} data-loading-states {
             label for="username" { "Username" }
-            input type="text" name="username" placeholder="username" required;
+            input type="text" name="username" placeholder="Username" required;
             small { "Unique & Permanent" }
             button data-loading-aria-busy { "Check Username" }
             #error {}
@@ -24,7 +26,12 @@ pub async fn index(req: Request<Body>) -> Markup {
     page::page(&host, title, desc, content)
 }
 
-pub async fn validate_username(State(state): State<AppState>, form: Form<ValidateUsernameReq>) -> (StatusCode, Markup) {
+#[derive(Debug, Deserialize)]
+pub struct ValidateUsernameReq {
+    pub username: String
+}
+
+async fn validate_username(State(state): State<AppState>, form: Form<ValidateUsernameReq>) -> (StatusCode, Markup) {
     match client::is_valid(&form.0, &state.db).await {
         Err(err) => (StatusCode::BAD_REQUEST, error_html(err)),
         Ok(false) => (StatusCode::FORBIDDEN, error_html("Username already taken")),
@@ -32,22 +39,33 @@ pub async fn validate_username(State(state): State<AppState>, form: Form<Validat
     }
 }
 
-fn otp_form(qr: String, secret_b32: String) -> Markup {
+fn otp_form(username: String, qr_b64: String, secret_b32: String) -> Markup {
+    let hxvals = json!({
+        "username": username,
+        "otp_b32": secret_b32
+    });
+
     html! {
-        form hx-post="/signup-submission" hx-swap="outerHTML" {
-            label for="qr" { "Scan me with your auth app" }
-            small { "Preferably one that is backed up (not Google Authenticator)" }
-            img src=(qr);
-            (copyblock("otc_b32".to_string(), secret_b32))
-            small { "Or manually add code" }
-            (six_digit_entry())
-            button data-loading-aria-busy { "Create Account" }
+        form hx-post="/signup/validate-otp" hx-swap="outerHTML" hx-target="#error" hx-vals=(hxvals.to_string()) data-loading-states {
+            article {
+                header {
+                    label class="center" for="qr" { "Scan me with your auth app" }
+                    img id="qr" class="center qr" src=(qr(qr_b64));
+                    br;
+                    (copyblock(secret_b32))
+                }
+                body {
+                    (six_digit_entry())
+                    button class="center" data-loading-aria-busy style="width:auto" { "Create Account" }
+                }
+            }
+            #error {}
         }
     }
 }
 
 fn new_otp_form(username: String) -> (StatusCode, Markup) {
-    let totp = create_totp(username);
+    let totp = create_totp(username.clone());
     let Ok(totp) = totp else {
         return (StatusCode::BAD_REQUEST, error_html(totp.unwrap_err()));
     };
@@ -58,39 +76,37 @@ fn new_otp_form(username: String) -> (StatusCode, Markup) {
     };
 
     let secret = totp.get_secret_base32();
-    (StatusCode::OK, otp_form(qr, secret))
+    (StatusCode::OK, otp_form(username, qr, secret))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct SignupSubmissionReq {
     pub username: String,
     pub otp_b32: String,
-    pub otc_1: u8,
-    pub otc_2: u8,
-    pub otc_3: u8,
-    pub otc_4: u8,
-    pub otc_5: u8,
-    pub otc_6: u8,
+    pub six_digits: String
 }
 
-impl SignupSubmissionReq {
-    fn get_six_digits(&self) -> Result<String, FromUtf8Error> {
-        String::from_utf8(vec![self.otc_1, self.otc_2, self.otc_3, self.otc_4, self.otc_5, self.otc_6])
+impl From<SignupSubmissionReq> for CreateClientReq {
+    fn from(value: SignupSubmissionReq) -> Self {
+        CreateClientReq{ username: value.username, otp_b32: value.otp_b32 }
     }
 }
 
-pub async fn validate_otp(State(state): State<AppState>, form: Form<SignupSubmissionReq>) -> (StatusCode, Markup) {
-    let sixdigits = form.get_six_digits();
-    let Ok(sixdigits) = sixdigits else {
-        return (StatusCode::BAD_REQUEST, error_html(sixdigits.unwrap_err()));
-    };
-
-    if let Err(verification) = verify_6digit_b32(&form.otp_b32, sixdigits) {
-        return (StatusCode::BAD_REQUEST, error_html(verification));
+///On Success will set the JWT Cookie
+async fn validate_otp(State(state): State<AppState>, jar: PrivateCookieJar, form: Form<SignupSubmissionReq>) -> Response {
+    if let Err(verification) = verify_6digit_b32(form.otp_b32.clone(), form.six_digits.clone()) {
+        return (StatusCode::BAD_REQUEST, error_html(verification)).into_response();
     }
-    
-    match client::create(CreateClientReq{ username: form.username, otp_b32: form.otp_b32 }, &state.db).await {
-        Ok(client_id) => 
+    match client::create(form.0.into(), &state.db).await {
+        Ok(claims) => {
+            let token = claims.sign_with_key(&state.jwt_key);
+            let Ok(token) = token else {
+                return (StatusCode::BAD_REQUEST, error_html(token.unwrap_err())).into_response();
+            };
+            let jar = jar.add(Cookie::new("access_token", token));
+            (jar, hx_redirect("/")).into_response()
+        },
+        Err(_) => todo!(),
     }
 }
 

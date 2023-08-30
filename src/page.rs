@@ -1,4 +1,5 @@
 use crate::strings;
+use axum::http::HeaderMap;
 use maud::{html, Markup, DOCTYPE};
 
 fn body(content: Markup) -> Markup {
@@ -60,4 +61,10 @@ pub(crate) fn page(host: &str, title: &str, desc: &str, content: Markup) -> Mark
             (body(content))
         }
     }
+}
+
+pub fn hx_redirect(path: &str) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert("HX-Redirect", path.parse().unwrap());
+    headers
 }

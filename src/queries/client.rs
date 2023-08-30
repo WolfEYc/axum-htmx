@@ -1,6 +1,8 @@
 use serde::{Serialize, Deserialize};
 use sqlx::{FromRow, PgPool, postgres::PgQueryResult, Error};
 
+use crate::pages::signup::ValidateUsernameReq;
+
 #[derive(Serialize, Deserialize)]
 pub struct JWTClaims {
     pub id: i64,
@@ -28,11 +30,6 @@ pub struct CreateClientReq {
     pub otp_b32: String
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ValidateUsernameReq {
-    pub username: String
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Role {
     Normal,
@@ -42,7 +39,7 @@ pub enum Role {
 
 impl From<Client> for JWTClaims {
     fn from(value: Client) -> Self {
-        JWTClaims { id: value.id, username: value.username, role: value.role, exp:  }
+        JWTClaims { id: value.id, username: value.username, role: value.role, exp: crate::auth::gen_exp() }
     }
 }
 
@@ -59,19 +56,19 @@ pub async fn is_valid(req: &ValidateUsernameReq, pool: &PgPool) -> Result<bool, 
     .map(|r|r.is_none())
 }
 
-///Returns the created client's id (if successful)
-pub async fn create(req: CreateClientReq, pool: &PgPool) -> Result<i64, Error> {
-    sqlx::query_as!(ClientID,"
+///Returns a session token if sucessful
+pub async fn create(req: CreateClientReq, pool: &PgPool) -> Result<JWTClaims, Error> {
+    sqlx::query!("
         INSERT INTO client VALUES
         (DEFAULT, $1, $2)
-        RETURNING id
+        RETURNING *
         ",
     req.username,
     req.otp_b32
     )
     .fetch_one(pool)
     .await
-    .map(|r|r.id)
+    .map(|r| JWTClaims { id: r.id, exp: crate::auth::gen_exp(), username: r.username, role: Role::Normal })
 }
 
 pub async fn read(id: i64, pool: &PgPool) -> Result<Client, Error> {
@@ -87,6 +84,25 @@ pub async fn read(id: i64, pool: &PgPool) -> Result<Client, Error> {
     .map(|r| Client{
         id,
         username: r.username,
+        otp_b32: r.otp_b32,
+        role: if Some(true) == r.is_admin { Role::Admin } else if Some(true) == r.is_verified { Role::Verified } else { Role::Normal }
+    })
+}
+
+///use as little as possible please, username is NOT indexed
+pub async fn read_from_username(username: String, pool: &PgPool) -> Result<Client, Error> {
+    sqlx::query!("
+        SELECT *, (SELECT true FROM admin_client WHERE client_id = client.id) as is_admin, (SELECT true FROM verified_client WHERE client_id = client.id) as is_verified
+        FROM client
+        WHERE username = $1
+    ",
+    username
+    )
+    .fetch_one(pool)
+    .await
+    .map(|r| Client{
+        id: r.id,
+        username,
         otp_b32: r.otp_b32,
         role: if Some(true) == r.is_admin { Role::Admin } else if Some(true) == r.is_verified { Role::Verified } else { Role::Normal }
     })

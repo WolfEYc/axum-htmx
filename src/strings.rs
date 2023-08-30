@@ -54,3 +54,6 @@ pub static VIEWPORT: &str = "viewport";
 pub static VIEWPORT_CONTENT: &str = "width=device-width, initial-scale=1";
 pub static WEBSITE: &str = "website";
 pub static TARGET_ERROR: &str = "hx-target-4xx=#error";
+pub fn qr(qr_b64: String) -> String {
+    format!("data:image/png;base64,{}", qr_b64)
+}

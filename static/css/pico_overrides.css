@@ -45,3 +45,15 @@
   top: 5px;
   right: 5px;
 }
+
+.center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 50%;
+  text-align: center;
+}
+
+.qr {
+  border-radius: 5%;
+}
