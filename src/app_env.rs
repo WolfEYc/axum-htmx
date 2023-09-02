@@ -6,12 +6,12 @@ use tokio::sync::OnceCell;
 
 use crate::Boxres;
 
-static STATE: OnceCell<AppState> = OnceCell::new();
-pub fn state() -> AppState {
-    STATE.get().unwrap().clone()
+static STATE: OnceCell<AppState> = OnceCell::const_new();
+pub fn state() -> &'static AppState {
+    STATE.get().unwrap()
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AppState {
     pub db: PgPool,
     pub jwt_key: Hmac<Sha256>

@@ -13,14 +13,21 @@ async fn index(req: Request<Body>) -> Markup {
     let desc = "Create an account";
     
     let content = html! {
-        h1 align="center" { "Create Account" }
         form hx-ext="response-targets" hx-post="/signup/validate-username" hx-swap="outerHTML" .{(TARGET_ERROR)} data-loading-states {
-            label for="username" { "Username" }
-            input type="text" name="username" placeholder="Username" required;
-            small { "Unique & Permanent" }
-            button data-loading-aria-busy { "Check Username" }
-            #error {}
+            article {
+                header {
+                    h1 align="center" { "Create Account" }
+                    label for="username" { "Username" }
+                    input type="text" name="username" placeholder="Username" required;
+                    small { "Unique & Permanent" }
+                }
+                body {
+                    button data-loading-aria-busy { "Check Username" }
+                    #error {}
+                }
+            }
         }
+        a hx-boost="true" href="/login" role="button" class="secondary" { "Login Instead" }
     };
 
     page::page(&host, title, desc, content)

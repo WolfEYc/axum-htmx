@@ -1,5 +1,5 @@
 use std::{time::{SystemTime, UNIX_EPOCH}, io};
-use axum::{http::{Request, StatusCode}, response::{Response, IntoResponse}, middleware::Next, body::Body};
+use axum::{http::{Request, StatusCode}, response::{Response, IntoResponse}, middleware::Next};
 use axum_extra::extract::CookieJar;
 use hmac::Hmac;
 use jwt::VerifyWithKey;
@@ -49,31 +49,41 @@ pub fn gen_exp() -> u64 {
     unix_sex() + 3600
 }
 
-fn get_claims(key: Hmac<Sha256>, jar: CookieJar) -> Boxres<JWTClaims> {
+fn get_claims(key: &Hmac<Sha256>, jar: CookieJar) -> Boxres<JWTClaims> {
     Ok(jar.get("access_token")
     .ok_or_else(|| Error::new(ErrorKind::NotFound, "Missing Token"))?
     .to_string()
-    .verify_with_key(&key)?)
+    .verify_with_key(key)?)
 }
 
-pub async fn req_auth<B>(role_req: Role, req: Request<B>, next: Next<B>) -> Response {
-    let jar = CookieJar::from_headers(req.headers());
-    let claims_res = get_claims(state().jwt_key, jar);
+fn req_auth(role_req: Role, jar: CookieJar) -> Result<JWTClaims, Response> {
+    let claims_res = get_claims(&state().jwt_key, jar);
+    
     let Ok(claims) = claims_res else {
-        return (StatusCode::UNAUTHORIZED, error_html(claims_res.unwrap_err())).into_response();
+        return Err((StatusCode::UNAUTHORIZED, error_html(claims_res.unwrap_err())).into_response());
     };
 
     if claims.role < role_req {
-        return (StatusCode::UNAUTHORIZED, error_html(format!("Must be {:?} to access", role_req))).into_response();
+        return Err((StatusCode::UNAUTHORIZED, error_html(format!("Must be {:?} to access", role_req))).into_response());
     };
 
-    let mut req = req;
-    req.extensions_mut().insert(claims);
-    let req = req;
+    Ok(claims)
+}
+
+pub async fn req_admin<B>(jar: CookieJar, mut req: Request<B>, next: Next<B>) -> Response { 
+    match req_auth(Role::Admin, jar) {
+        Err(err) => return err,
+        Ok(claims) => req.extensions_mut().insert(claims)
+    };
 
     next.run(req).await
 }
 
-pub async fn req_admin<B>(req: Request<B>, next: Next<B>) -> Response {
-    req_auth(Role::Admin, req, next).await
+pub async fn req_role<B>(jar: CookieJar, mut req: Request<B>, next: Next<B>) -> Response { 
+    match req_auth(Role::Normal, jar) {
+        Err(err) => return err,
+        Ok(claims) => req.extensions_mut().insert(claims)
+    };
+
+    next.run(req).await
 }

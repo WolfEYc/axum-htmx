@@ -1,8 +1,7 @@
 use auth::req_admin;
-use axum::{routing::{get, post}, Router, Server, handler::HandlerWithoutStateExt, middleware};
+use axum::{routing::{get, post}, Router, Server, handler::HandlerWithoutStateExt, middleware::from_fn};
 use std::{net::SocketAddr, error::Error};
 use tower_http::services::ServeDir;
-
 mod auth;
 mod app_env;
 mod strings;
@@ -23,7 +22,7 @@ async fn main() -> Boxres<()> {
 
     let router = Router::new()
         .route("/console", get(console::index))
-        .layer(middleware::from_fn(req_admin))
+        .layer(from_fn(req_admin))
         .route("/", get(index::index))
         .route("/hello", post(hello::hello))
         .route("/login", get(pages::login::index).post(pages::login::login))
