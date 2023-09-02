@@ -3,11 +3,11 @@
 
 # TEAM
 
-    Isaac Wolf -- fullstack dev -- <twitter>
+    Isaac Wolf -- fullstack dev --
 
 # THANKS
 
-    <name>
+    The rust programming language, and its crates
 
 # TECHNOLOGY COLOPHON
 

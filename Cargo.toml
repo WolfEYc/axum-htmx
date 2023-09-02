@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 axum = "0.6.20"
-axum-extra = { version = "0.7.7", features = ["cookie-private"] }
+axum-extra = { version = "0.7.7", features = ["cookie"] }
 dotenvy = "0.15.7"
 hmac = "0.12.1"
 jwt = "0.16.0"

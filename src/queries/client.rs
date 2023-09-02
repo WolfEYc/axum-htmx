@@ -3,7 +3,7 @@ use sqlx::{FromRow, PgPool, postgres::PgQueryResult, Error};
 
 use crate::pages::signup::ValidateUsernameReq;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct JWTClaims {
     pub id: i64,
     pub exp: u64,
@@ -30,7 +30,7 @@ pub struct CreateClientReq {
     pub otp_b32: String
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum Role {
     Normal,
     Verified,

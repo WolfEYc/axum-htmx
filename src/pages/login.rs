@@ -1,10 +1,10 @@
-use axum::{http::{Request, StatusCode}, Form, response::{Response, IntoResponse}, extract::State, body::Body};
-use axum_extra::extract::{PrivateCookieJar, cookie::Cookie};
+use axum::{http::{Request, StatusCode}, Form, response::{Response, IntoResponse}, body::Body};
+use axum_extra::extract::{CookieJar, cookie::Cookie};
 use jwt::SignWithKey;
 use maud::{Markup, html};
 use serde::Deserialize;
 
-use crate::{page::{self, hx_redirect}, app_env::AppState, components::{error::error_html, six_digit_entry::six_digit_entry}, queries::client::{self, JWTClaims}, auth::verify_6digit_b32};
+use crate::{page::{self, hx_redirect}, components::{error::error_html, six_digit_entry::six_digit_entry}, queries::client::{self, JWTClaims}, auth::verify_6digit_b32, app_env::state};
 
 ///On success, will set jwt access token cookie and redirect to console
 pub async fn index(req: Request<Body>) -> Markup {
@@ -34,8 +34,8 @@ pub struct LoginReq {
 }
 
 ///Returns session token if success
-pub async fn login(State(state): State<AppState>, jar: PrivateCookieJar, form: Form<LoginReq>) -> Response {
-    let client = client::read_from_username(form.username.clone(), &state.db).await;
+pub async fn login(jar: CookieJar, form: Form<LoginReq>) -> Response {
+    let client = client::read_from_username(form.username.clone(), &state().db).await;
     let Ok(client) = client else {
         return (StatusCode::BAD_REQUEST, error_html(client.unwrap_err())).into_response();
     };
@@ -46,7 +46,7 @@ pub async fn login(State(state): State<AppState>, jar: PrivateCookieJar, form: F
 
     let claims = JWTClaims::from(client);
 
-    let token = claims.sign_with_key(&state.jwt_key);
+    let token = claims.sign_with_key(&state().jwt_key);
     let Ok(token) = token else {
         return (StatusCode::BAD_REQUEST, error_html(token.unwrap_err())).into_response();
     };

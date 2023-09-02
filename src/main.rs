@@ -1,4 +1,5 @@
-use axum::{routing::{get, post}, Router, Server, handler::HandlerWithoutStateExt};
+use auth::req_admin;
+use axum::{routing::{get, post}, Router, Server, handler::HandlerWithoutStateExt, middleware};
 use std::{net::SocketAddr, error::Error};
 use tower_http::services::ServeDir;
 
@@ -13,18 +14,20 @@ mod queries;
 use components::*;
 use pages::*;
 
+type Boxres<T> = Result<T,Box<dyn Error>>;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Boxres<()> {
     dotenvy::dotenv()?;
-    let state = app_env::create_appstate().await?;
-    sqlx::migrate!().run(&state.db).await?;
+    app_env::create_appstate().await?;
 
     let router = Router::new()
+        .route("/console", get(console::index))
+        .layer(middleware::from_fn(req_admin))
         .route("/", get(index::index))
         .route("/hello", post(hello::hello))
         .route("/login", get(pages::login::index).post(pages::login::login))
         .nest("/signup", signup::signup_routes())
-        .with_state(state)
         .fallback_service(ServeDir::new("./static")
             .not_found_service(notfound::not_found.into_service()));
         

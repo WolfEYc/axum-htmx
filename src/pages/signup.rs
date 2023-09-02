@@ -1,10 +1,10 @@
-use axum::{http::{Request, StatusCode}, body::Body, Form, Router, routing::{get, post}, extract::State, response::{Response, IntoResponse}};
-use axum_extra::extract::{PrivateCookieJar, cookie::Cookie};
+use axum::{http::{Request, StatusCode}, body::Body, Form, Router, routing::{get, post}, response::{Response, IntoResponse}};
+use axum_extra::extract::{CookieJar, cookie::Cookie};
 use jwt::SignWithKey;
 use maud::{Markup, html};
 use serde::Deserialize;
 use serde_json::json;
-use crate::{page::{self, hx_redirect}, components::{error::error_html, copyblock::copyblock, six_digit_entry::six_digit_entry}, queries::client::{self, CreateClientReq}, auth::{create_totp, verify_6digit_b32}, strings::{TARGET_ERROR, qr}, app_env::AppState};
+use crate::{page::{self, hx_redirect}, components::{error::error_html, copyblock::copyblock, six_digit_entry::six_digit_entry}, queries::client::{self, CreateClientReq}, auth::{create_totp, verify_6digit_b32}, strings::{TARGET_ERROR, qr}, app_env::state};
 
 ///On success, will set jwt access token cookie and redirect to console
 async fn index(req: Request<Body>) -> Markup {
@@ -31,8 +31,8 @@ pub struct ValidateUsernameReq {
     pub username: String
 }
 
-async fn validate_username(State(state): State<AppState>, form: Form<ValidateUsernameReq>) -> (StatusCode, Markup) {
-    match client::is_valid(&form.0, &state.db).await {
+async fn validate_username(form: Form<ValidateUsernameReq>) -> (StatusCode, Markup) {
+    match client::is_valid(&form.0, &state().db).await {
         Err(err) => (StatusCode::BAD_REQUEST, error_html(err)),
         Ok(false) => (StatusCode::FORBIDDEN, error_html("Username already taken")),
         Ok(true) => new_otp_form(form.0.username)
@@ -93,13 +93,13 @@ impl From<SignupSubmissionReq> for CreateClientReq {
 }
 
 ///On Success will set the JWT Cookie
-async fn validate_otp(State(state): State<AppState>, jar: PrivateCookieJar, form: Form<SignupSubmissionReq>) -> Response {
+async fn validate_otp(jar: CookieJar, form: Form<SignupSubmissionReq>) -> Response {
     if let Err(verification) = verify_6digit_b32(form.otp_b32.clone(), form.six_digits.clone()) {
         return (StatusCode::BAD_REQUEST, error_html(verification)).into_response();
     }
-    match client::create(form.0.into(), &state.db).await {
+    match client::create(form.0.into(), &state().db).await {
         Ok(claims) => {
-            let token = claims.sign_with_key(&state.jwt_key);
+            let token = claims.sign_with_key(&state().jwt_key);
             let Ok(token) = token else {
                 return (StatusCode::BAD_REQUEST, error_html(token.unwrap_err())).into_response();
             };
@@ -110,7 +110,7 @@ async fn validate_otp(State(state): State<AppState>, jar: PrivateCookieJar, form
     }
 }
 
-pub fn signup_routes() -> Router<AppState> {
+pub fn signup_routes() -> Router {
     Router::new()
         .route("/", get(index))
         .route("/validate-username", post(validate_username))
